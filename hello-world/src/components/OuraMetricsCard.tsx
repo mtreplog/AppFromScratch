@@ -1,6 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { Activity, Moon, Zap } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import type { Cr1d7_healthmetrics } from '../generated/models/Cr1d7_healthmetricsModel';
+import { HealthDataService } from '../services/HealthDataService';
 
 interface OuraMetric {
   label: string;
@@ -9,23 +11,30 @@ interface OuraMetric {
   color: string;
 }
 
-const OuraMetricsCard: React.FC = () => {
+interface OuraMetricsCardProps {
+  data?: Cr1d7_healthmetrics;
+}
+
+const OuraMetricsCard: React.FC<OuraMetricsCardProps> = ({ data }) => {
+  // Transform Dataverse data to display metrics
+  const transformedData = data ? HealthDataService.transformToOuraMetrics(data) : null;
+
   const metrics: OuraMetric[] = [
     {
       label: 'Sleep Score',
-      value: 87,
+      value: transformedData?.sleepScore || 87,
       icon: <Moon className="w-8 h-8" />,
       color: 'from-blue-400 to-blue-600',
     },
     {
       label: 'Readiness',
-      value: 92,
+      value: transformedData?.readinessScore || 92,
       icon: <Zap className="w-8 h-8" />,
       color: 'from-yellow-400 to-yellow-600',
     },
     {
       label: 'Activity',
-      value: 78,
+      value: transformedData?.activityScore || 78,
       icon: <Activity className="w-8 h-8" />,
       color: 'from-green-400 to-green-600',
     },

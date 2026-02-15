@@ -1,8 +1,10 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
-import { Calendar, Settings, Bell, Heart } from 'lucide-react';
+import { Calendar, Settings, Bell, Heart, AlertCircle } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import OuraMetricsCard from './OuraMetricsCard';
 import NutritionCard from './NutritionCard';
+import { HealthDataService } from '../services/HealthDataService';
+import type { Cr1d7_healthmetrics } from '../generated/models/Cr1d7_healthmetricsModel';
 
 interface HealthMetric {
   label: string;
@@ -14,7 +16,61 @@ interface HealthMetric {
 
 const HealthDashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rawData, setRawData] = useState<Cr1d7_healthmetrics | null>(null);
+  const [quickMetrics, setQuickMetrics] = useState<HealthMetric[]>([]);
 
+  // Fetch data from Dataverse on component mount
+  useEffect(() => {
+    const loadHealthData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await HealthDataService.fetchTodayMetrics();
+        if (data) {
+          setRawData(data);
+          
+          // Transform to quick metrics
+          const metrics = HealthDataService.transformToQuickMetrics(data);
+          setQuickMetrics([
+            {
+              label: 'Heart Rate',
+              value: metrics.heartRate.toString(),
+              change: '+3 bpm',
+              icon: <Heart className="w-6 h-6" />,
+              color: 'from-red-400 to-pink-500',
+            },
+            {
+              label: 'Steps',
+              value: metrics.steps.toLocaleString(),
+              change: '+2,100',
+              icon: <Heart className="w-6 h-6" />,
+              color: 'from-green-400 to-emerald-500',
+            },
+            {
+              label: 'Stress Level',
+              value: metrics.stressLevel,
+              change: '-15%',
+              icon: <Heart className="w-6 h-6" />,
+              color: 'from-blue-400 to-cyan-500',
+            },
+          ]);
+        } else {
+          setError('No health data found for today');
+        }
+      } catch (err) {
+        console.error('Failed to load health data:', err);
+        setError('Failed to load health data from Dataverse');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHealthData();
+  }, []);
+
+  // Update time every minute
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -24,30 +80,6 @@ const HealthDashboard: React.FC = () => {
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
   }, []);
-
-  const quickMetrics: HealthMetric[] = [
-    {
-      label: 'Heart Rate',
-      value: '72',
-      change: '+3 bpm',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'from-red-400 to-pink-500',
-    },
-    {
-      label: 'Steps',
-      value: '8,234',
-      change: '+2,100',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'from-green-400 to-emerald-500',
-    },
-    {
-      label: 'Stress Level',
-      value: 'Low',
-      change: '-15%',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'from-blue-400 to-cyan-500',
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-8">
@@ -69,6 +101,11 @@ const HealthDashboard: React.FC = () => {
               <Calendar className="w-4 h-4" />
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
+            {rawData && (
+              <p className="text-xs text-gray-500 mt-1">
+                Data: {rawData.cr1d7_metricname} • Last updated: {rawData.cr1d7_date ? new Date(rawData.cr1d7_date).toLocaleTimeString() : 'N/A'}
+              </p>
+            )}
           </div>
           <div className="flex gap-3">
             <button className="glass-card p-3 hover:bg-opacity-20 transition-all duration-300">
@@ -80,34 +117,54 @@ const HealthDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-8 p-4 backdrop-blur-[10px] bg-red-500 bg-opacity-10 rounded-3xl border border-red-500 border-opacity-20 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <p className="text-red-200 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="mb-8 p-4 backdrop-blur-[10px] bg-blue-500 bg-opacity-10 rounded-3xl border border-blue-500 border-opacity-20 flex items-center gap-3">
+            <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+            <p className="text-blue-200 text-sm">Loading health metrics from Dataverse...</p>
+          </div>
+        )}
+
         {/* Quick Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {quickMetrics.map((metric, idx) => (
-            <GlassCard
-              key={idx}
-              animated
-              className="p-6 animate-slide-in"
-              style={{ animationDelay: `${idx * 0.1}s` }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className={`p-3 rounded-full bg-gradient-to-br ${metric.color} bg-opacity-20`}>
-                  <span className="text-white opacity-80">{metric.icon}</span>
+        {!loading && quickMetrics.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {quickMetrics.map((metric, idx) => (
+              <GlassCard
+                key={idx}
+                animated
+                className="p-6 animate-slide-in"
+                style={{ animationDelay: `${idx * 0.1}s` }}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 rounded-full bg-gradient-to-br ${metric.color} bg-opacity-20`}>
+                    <span className="text-white opacity-80">{metric.icon}</span>
+                  </div>
+                  <span className="text-green-400 text-sm font-semibold">{metric.change}</span>
                 </div>
-                <span className="text-green-400 text-sm font-semibold">{metric.change}</span>
-              </div>
-              <p className="text-gray-400 text-sm mb-2">{metric.label}</p>
-              <p className="metric-value bg-gradient-to-r from-white to-gray-200 inline-block">
-                {metric.value}
-              </p>
-            </GlassCard>
-          ))}
-        </div>
+                <p className="text-gray-400 text-sm mb-2">{metric.label}</p>
+                <p className="metric-value bg-gradient-to-r from-white to-gray-200 inline-block">
+                  {metric.value}
+                </p>
+              </GlassCard>
+            ))}
+          </div>
+        )}
 
         {/* Main Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
-          <OuraMetricsCard />
-          <NutritionCard />
-        </div>
+        {!loading && rawData && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
+            <OuraMetricsCard data={rawData} />
+            <NutritionCard data={rawData} />
+          </div>
+        )}
 
         {/* Weekly Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

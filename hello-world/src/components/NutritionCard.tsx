@@ -1,6 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { Apple, Flame } from 'lucide-react';
 import { GlassCard } from './GlassCard';
+import type { Cr1d7_healthmetrics } from '../generated/models/Cr1d7_healthmetricsModel';
+import { HealthDataService } from '../services/HealthDataService';
 
 interface NutritionMetric {
   label: string;
@@ -11,11 +13,18 @@ interface NutritionMetric {
   icon: ReactNode;
 }
 
-const NutritionCard: React.FC = () => {
+interface NutritionCardProps {
+  data?: Cr1d7_healthmetrics;
+}
+
+const NutritionCard: React.FC<NutritionCardProps> = ({ data }) => {
+  // Transform Dataverse data to display metrics
+  const transformedData = data ? HealthDataService.transformToNutritionMetrics(data) : null;
+
   const metrics: NutritionMetric[] = [
     {
       label: 'Calories',
-      current: 1850,
+      current: transformedData?.calories || 1850,
       goal: 2200,
       unit: 'kcal',
       color: 'from-orange-400 to-red-500',
@@ -23,7 +32,7 @@ const NutritionCard: React.FC = () => {
     },
     {
       label: 'Protein',
-      current: 125,
+      current: transformedData?.protein || 125,
       goal: 160,
       unit: 'g',
       color: 'from-red-400 to-pink-500',
@@ -31,7 +40,7 @@ const NutritionCard: React.FC = () => {
     },
     {
       label: 'Carbs',
-      current: 245,
+      current: transformedData?.carbs || 245,
       goal: 275,
       unit: 'g',
       color: 'from-amber-400 to-orange-500',
@@ -39,7 +48,7 @@ const NutritionCard: React.FC = () => {
     },
     {
       label: 'Fats',
-      current: 65,
+      current: transformedData?.fats || 65,
       goal: 73,
       unit: 'g',
       color: 'from-yellow-400 to-amber-500',
